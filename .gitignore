@@ -1,0 +1,17 @@
+# Terraform working directory and generated plans/state
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# Local variable overrides and secrets
+*.tfvars.local
+*.auto.tfvars
+*.auto.tfvars.json
+
+# IDE and OS files
+.vscode/
+.DS_Store
+Thumbs.db
