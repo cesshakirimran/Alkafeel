@@ -34,6 +34,7 @@ stages:
                 --output /tmp/terraform.zip \
                 "https://releases.hashicorp.com/terraform/${terraform_version}/terraform_${terraform_version}_linux_amd64.zip"
               unzip -oq /tmp/terraform.zip -d "$install_dir"
+              export PATH="$install_dir:$PATH"
               echo "##vso[task.prependpath]$install_dir"
               terraform version
             displayName: Install Terraform
@@ -95,6 +96,7 @@ stages:
                 --output /tmp/terraform.zip \
                 "https://releases.hashicorp.com/terraform/${terraform_version}/terraform_${terraform_version}_linux_amd64.zip"
               unzip -oq /tmp/terraform.zip -d "$install_dir"
+              export PATH="$install_dir:$PATH"
               echo "##vso[task.prependpath]$install_dir"
               terraform version
             displayName: Install Terraform
