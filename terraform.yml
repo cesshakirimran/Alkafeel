@@ -1,74 +1,85 @@
-name: terraform
+trigger:
+  branches:
+    include:
+      - main
 
-on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
+pr:
+  branches:
+    include:
+      - main
 
-permissions:
-  id-token: write      # required for OIDC login to Azure -- no stored secrets
-  contents: read
-  pull-requests: write # so the plan can be posted as a PR comment
+variables:
+  terraformVersion: '1.9.8'
+  azureServiceConnection: 'REPLACE_WITH_AZURE_SERVICE_CONNECTION'
 
-env:
-  ARM_USE_OIDC: true
-  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+stages:
+  - stage: Plan
+    displayName: Terraform plan
+    jobs:
+      - job: Plan
+        displayName: Format, validate, and plan
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
 
-jobs:
-  plan:
-    name: plan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+          - task: TerraformInstaller@1
+            displayName: Install Terraform
+            inputs:
+              terraformVersion: $(terraformVersion)
 
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.9.8
+          - task: AzureCLI@2
+            displayName: Terraform init, validate, and plan
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              addSpnToEnvironment: true
+              inlineScript: |
+                set -euo pipefail
+                export ARM_USE_CLI=true
+                terraform fmt -check -recursive
+                terraform init
+                terraform validate
+                terraform plan -no-color -out=tfplan
 
-      - name: format check
-        run: terraform fmt -check -recursive
+          - publish: tfplan
+            displayName: Publish Terraform plan
+            artifact: terraform-plan
 
-      - name: init
-        run: terraform init
+  - stage: Apply
+    displayName: Terraform apply
+    dependsOn: Plan
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'IndividualCI'))
+    jobs:
+      - deployment: Apply
+        displayName: Apply Terraform plan
+        environment: production
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
 
-      - name: validate
-        run: terraform validate
+                - task: TerraformInstaller@1
+                  displayName: Install Terraform
+                  inputs:
+                    terraformVersion: $(terraformVersion)
 
-      - name: plan
-        id: plan
-        run: terraform plan -no-color -out=tfplan
+                - download: current
+                  artifact: terraform-plan
 
-      - name: post plan to pull request
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const body = `### Terraform plan\n\`\`\`\n${{ steps.plan.outputs.stdout }}\n\`\`\``;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body.substring(0, 65000)
-            });
-
-  apply:
-    name: apply
-    needs: plan
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    environment: production   # this is what forces a human approval gate
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.9.8
-
-      - name: init
-        run: terraform init
-
-      - name: apply
-        run: terraform apply -auto-approve
+                - task: AzureCLI@2
+                  displayName: Terraform apply
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    addSpnToEnvironment: true
+                    inlineScript: |
+                      set -euo pipefail
+                      export ARM_USE_CLI=true
+                      terraform init
+                      terraform apply -auto-approve "$(Pipeline.Workspace)/terraform-plan/tfplan"
