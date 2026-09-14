@@ -23,10 +23,14 @@ stages:
         steps:
           - checkout: self
 
-          - task: TerraformInstaller@1
+          - bash: |
+              set -euo pipefail
+              mkdir -p "$HOME/bin"
+              curl -fsSLo terraform.zip "https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip"
+              unzip -oq terraform.zip -d "$HOME/bin"
+              echo "##vso[task.prependpath]$HOME/bin"
+              terraform version
             displayName: Install Terraform
-            inputs:
-              terraformVersion: $(terraformVersion)
 
           - task: AzureCLI@2
             displayName: Terraform init, validate, and plan
@@ -47,39 +51,54 @@ stages:
             displayName: Publish Terraform plan
             artifact: terraform-plan
 
-  - stage: Apply
-    displayName: Terraform apply
+  - stage: Approval
+    displayName: Approve Terraform apply
     dependsOn: Plan
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'IndividualCI'))
     jobs:
-      - deployment: Apply
+      - job: ManualApproval
+        displayName: Manual approval
+        pool: server
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 1440
+            inputs:
+              instructions: Review the Terraform plan artifact before approving the apply stage.
+              onTimeout: reject
+
+  - stage: Apply
+    displayName: Terraform apply
+    dependsOn: Approval
+    condition: succeeded()
+    jobs:
+      - job: Apply
         displayName: Apply Terraform plan
-        environment: production
         pool:
           vmImage: ubuntu-latest
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - checkout: self
+        steps:
+          - checkout: self
 
-                - task: TerraformInstaller@1
-                  displayName: Install Terraform
-                  inputs:
-                    terraformVersion: $(terraformVersion)
+          - bash: |
+              set -euo pipefail
+              mkdir -p "$HOME/bin"
+              curl -fsSLo terraform.zip "https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip"
+              unzip -oq terraform.zip -d "$HOME/bin"
+              echo "##vso[task.prependpath]$HOME/bin"
+              terraform version
+            displayName: Install Terraform
 
-                - download: current
-                  artifact: terraform-plan
+          - download: current
+            artifact: terraform-plan
 
-                - task: AzureCLI@2
-                  displayName: Terraform apply
-                  inputs:
-                    azureSubscription: $(azureServiceConnection)
-                    scriptType: bash
-                    scriptLocation: inlineScript
-                    addSpnToEnvironment: true
-                    inlineScript: |
-                      set -euo pipefail
-                      export ARM_USE_CLI=true
-                      terraform init
-                      terraform apply -auto-approve "$(Pipeline.Workspace)/terraform-plan/tfplan"
+          - task: AzureCLI@2
+            displayName: Terraform apply
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              addSpnToEnvironment: true
+              inlineScript: |
+                set -euo pipefail
+                export ARM_USE_CLI=true
+                terraform init
+                terraform apply -auto-approve "$(Pipeline.Workspace)/terraform-plan/tfplan"
