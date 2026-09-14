@@ -10,7 +10,7 @@ pr:
 
 variables:
   terraformVersion: '1.9.8'
-  azureServiceConnection: 'REPLACE_WITH_AZURE_SERVICE_CONNECTION'
+  azureServiceConnection: 'cesshakirimran'
 
 stages:
   - stage: Plan
