@@ -25,10 +25,16 @@ stages:
 
           - bash: |
               set -euo pipefail
-              mkdir -p "$HOME/bin"
-              curl -fsSLo terraform.zip "https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip"
-              unzip -oq terraform.zip -d "$HOME/bin"
-              echo "##vso[task.prependpath]$HOME/bin"
+              terraform_version="$(terraformVersion)"
+              install_dir="$HOME/bin"
+              mkdir -p "$install_dir"
+              command -v curl
+              command -v unzip
+              curl --fail --silent --show-error --location --retry 3 \
+                --output /tmp/terraform.zip \
+                "https://releases.hashicorp.com/terraform/${terraform_version}/terraform_${terraform_version}_linux_amd64.zip"
+              unzip -oq /tmp/terraform.zip -d "$install_dir"
+              echo "##vso[task.prependpath]$install_dir"
               terraform version
             displayName: Install Terraform
 
@@ -80,10 +86,16 @@ stages:
 
           - bash: |
               set -euo pipefail
-              mkdir -p "$HOME/bin"
-              curl -fsSLo terraform.zip "https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip"
-              unzip -oq terraform.zip -d "$HOME/bin"
-              echo "##vso[task.prependpath]$HOME/bin"
+              terraform_version="$(terraformVersion)"
+              install_dir="$HOME/bin"
+              mkdir -p "$install_dir"
+              command -v curl
+              command -v unzip
+              curl --fail --silent --show-error --location --retry 3 \
+                --output /tmp/terraform.zip \
+                "https://releases.hashicorp.com/terraform/${terraform_version}/terraform_${terraform_version}_linux_amd64.zip"
+              unzip -oq /tmp/terraform.zip -d "$install_dir"
+              echo "##vso[task.prependpath]$install_dir"
               terraform version
             displayName: Install Terraform
 
