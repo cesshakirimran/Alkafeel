@@ -1,7 +1,6 @@
 # Site blueprint — Terraform practice
 
-A small, real Terraform project built around the problem in the AH Technology
-OT & Edge Engineer role: **one blueprint, many sites**.
+A small, real Terraform project built around the problem in the one blueprint, many sites.
 
 Each site gets a resource group, a VNet with an OT subnet and an iDMZ subnet,
 NSGs that enforce the segmentation rule (OT may publish up, the iDMZ may never
