@@ -10,7 +10,7 @@ pr:
 
 variables:
   terraformVersion: '1.9.8'
-  azureServiceConnection: 'cesshakirimran'
+  azureServiceConnection: 'Alkafeel'
 
 stages:
   - stage: Plan
